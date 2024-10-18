@@ -356,6 +356,7 @@ const decrepit_sources = &.{
 const fipsmodule_sources = &.{
     "crypto/fipsmodule/bcm.c",
     "crypto/fipsmodule/fips_shared_support.c",
+    "crypto/fipsmodule/cipher/aead.c",
 };
 
 const generated_fipsmodule_sources = &.{
@@ -577,15 +578,4 @@ pub fn build(b: *std.Build) void {
     });
 
     b.installArtifact(libpki);
-
-    const tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const run_tests = b.addRunArtifact(tests);
-
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_tests.step);
 }
