@@ -497,13 +497,15 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     libfipsmodule.linkLibC();
-    libfipsmodule.addIncludePath(.{ .path = "vendor/include" });
-    inline for (fipsmodule_sources) |path| {
-        libfipsmodule.addCSourceFile(.{ .file = .{ .path = "vendor/" ++ path }, .flags = &.{} });
-    }
-    inline for (generated_fipsmodule_sources) |path| {
-        libfipsmodule.addCSourceFile(.{ .file = .{ .path = path }, .flags = &.{} });
-    }
+    libfipsmodule.addIncludePath(b.path("vendor/include"));
+    libfipsmodule.addCSourceFiles(.{
+        .root = b.path("vendor"),
+        .files = fipsmodule_sources,
+    });
+    libfipsmodule.addCSourceFiles(.{
+        .root = b.path("."),
+        .files = generated_fipsmodule_sources,
+    });
     b.installArtifact(libfipsmodule);
 
     const libcrypto = b.addStaticLibrary(.{
@@ -513,15 +515,16 @@ pub fn build(b: *std.Build) void {
     });
     libcrypto.linkLibC();
     libcrypto.linkLibrary(libfipsmodule);
-    libcrypto.addIncludePath(.{ .path = "vendor/include" });
+    libcrypto.addIncludePath(b.path("vendor/include"));
 
-    inline for (crypto_sources) |path| {
-        libcrypto.addCSourceFile(.{ .file = .{ .path = "vendor/" ++ path }, .flags = &.{} });
-    }
-    inline for (generated_crypto_sources) |path| {
-        libcrypto.addCSourceFile(.{ .file = .{ .path = path }, .flags = &.{} });
-    }
-
+    libcrypto.addCSourceFiles(.{
+        .root = b.path("vendor"),
+        .files = crypto_sources,
+    });
+    libcrypto.addCSourceFiles(.{
+        .root = b.path("."),
+        .files = generated_crypto_sources,
+    });
     b.installArtifact(libcrypto);
 
     const libssl = b.addStaticLibrary(.{
@@ -532,11 +535,12 @@ pub fn build(b: *std.Build) void {
     libssl.linkLibC();
     libssl.linkLibCpp();
     libssl.linkLibrary(libcrypto);
-    libssl.addIncludePath(.{ .path = "vendor/include" });
-    libssl.installHeadersDirectory("vendor/include", "");
-    inline for (ssl_sources) |path| {
-        libssl.addCSourceFile(.{ .file = .{ .path = "vendor/" ++ path }, .flags = &.{} });
-    }
+    libssl.addIncludePath(b.path("vendor/include"));
+    libssl.installHeadersDirectory(b.path("vendor/include"), "", .{});
+    libssl.addCSourceFiles(.{
+        .root = b.path("vendor"),
+        .files = ssl_sources,
+    });
 
     b.installArtifact(libssl);
 
@@ -545,15 +549,17 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    libdecrepit.linkLibC();
+    b.installArtifact(libdecrepit);
+
+    libdecrepit.addIncludePath(b.path("vendor/include"));
     libdecrepit.linkLibrary(libcrypto);
     libdecrepit.linkLibrary(libssl);
-    libdecrepit.addIncludePath(.{ .path = "vendor/include" });
-    inline for (decrepit_sources) |path| {
-        libdecrepit.addCSourceFile(.{ .file = .{ .path = "vendor/" ++ path }, .flags = &.{} });
-    }
+    libdecrepit.linkLibC();
 
-    b.installArtifact(libdecrepit);
+    libdecrepit.addCSourceFiles(.{
+        .root = b.path("vendor"),
+        .files = decrepit_sources,
+    });
 
     const libpki = b.addStaticLibrary(.{
         .name = "pki",
@@ -563,31 +569,17 @@ pub fn build(b: *std.Build) void {
     libpki.linkLibC();
     libpki.linkLibCpp();
     libpki.linkLibrary(libcrypto);
-    libpki.addIncludePath(.{ .path = "vendor/include" });
-    inline for (pki_sources) |path| {
-        libpki.addCSourceFile(.{ .file = .{ .path = "vendor/" ++ path }, .flags = &.{"-D_BORINGSSL_LIBPKI_"} });
-    }
+    libpki.addIncludePath(b.path("vendor/include"));
+    libpki.addCSourceFiles(.{
+        .root = b.path("vendor"),
+        .files = pki_sources,
+        .flags = &.{"-D_BORINGSSL_LIBPKI_"},
+    });
 
     b.installArtifact(libpki);
 
-    const bssl = b.addExecutable(.{
-        .name = "bssl",
-        .target = target,
-        .optimize = optimize,
-    });
-    bssl.linkLibC();
-    bssl.linkLibCpp();
-    bssl.linkLibrary(libssl);
-    bssl.linkLibrary(libcrypto);
-    bssl.addIncludePath(.{ .path = "vendor/include" });
-    inline for (bssl_sources) |path| {
-        bssl.addCSourceFile(.{ .file = .{ .path = "vendor/" ++ path }, .flags = &.{} });
-    }
-
-    b.installArtifact(bssl);
-
     const tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
