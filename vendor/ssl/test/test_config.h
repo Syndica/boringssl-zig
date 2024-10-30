@@ -24,6 +24,18 @@
 
 #include "test_state.h"
 
+enum class CredentialConfigType { kX509, kDelegated };
+
+struct CredentialConfig {
+  CredentialConfigType type;
+  std::string cert_file;
+  std::string key_file;
+  std::vector<uint16_t> signing_prefs;
+  std::string delegated_credential;
+  std::string ocsp_response;
+  std::string signed_cert_timestamps;
+};
+
 struct TestConfig {
   int port = 0;
   bool ipv6 = false;
@@ -40,6 +52,7 @@ struct TestConfig {
   std::vector<uint16_t> curves;
   std::string key_file;
   std::string cert_file;
+  std::string trust_cert;
   std::string expect_server_name;
   bool enable_ech_grease = false;
   std::vector<std::string> ech_server_configs;
@@ -54,9 +67,12 @@ struct TestConfig {
   std::string expect_certificate_types;
   bool require_any_client_certificate = false;
   std::string advertise_npn;
+  bool advertise_empty_npn = false;
   std::string expect_next_proto;
+  bool expect_no_next_proto = false;
   bool false_start = false;
   std::string select_next_proto;
+  bool select_empty_next_proto = false;
   bool async = false;
   bool write_different_record_sizes = false;
   bool cbc_record_splitting = false;
@@ -73,7 +89,6 @@ struct TestConfig {
   std::string host_name;
   std::string advertise_alpn;
   std::string expect_alpn;
-  std::string expect_late_alpn;
   std::string expect_advertised_alpn;
   std::string select_alpn;
   bool decline_alpn = false;
@@ -82,6 +97,7 @@ struct TestConfig {
   bool defer_alps = false;
   std::vector<std::pair<std::string, std::string>> application_settings;
   std::unique_ptr<std::string> expect_peer_application_settings;
+  bool alps_use_new_codepoint = false;
   std::string quic_transport_params;
   std::string expect_quic_transport_params;
   // Set quic_use_legacy_codepoint to 0 or 1 to configure, -1 uses default.
@@ -102,6 +118,7 @@ struct TestConfig {
   bool implicit_handshake = false;
   bool use_early_callback = false;
   bool fail_early_callback = false;
+  bool fail_early_callback_ech_rewind = false;
   bool install_ddos_callback = false;
   bool fail_ddos_callback = false;
   bool fail_cert_callback = false;
@@ -118,6 +135,7 @@ struct TestConfig {
   bool expect_accept_early_data = false;
   bool expect_reject_early_data = false;
   bool expect_no_offer_early_data = false;
+  bool expect_no_server_name = false;
   bool use_ticket_callback = false;
   bool renew_ticket = false;
   bool enable_early_data = false;
@@ -188,8 +206,6 @@ struct TestConfig {
   bool server_preference = false;
   bool export_traffic_secrets = false;
   bool key_update = false;
-  bool expect_delegated_credential_used = false;
-  std::string delegated_credential;
   std::string expect_early_data_reason;
   bool expect_hrr = false;
   bool expect_no_hrr = false;
@@ -198,6 +214,11 @@ struct TestConfig {
   int early_write_after_message = 0;
   bool fips_202205 = false;
   bool wpa_202304 = false;
+  bool cnsa_202407 = false;
+  bool no_check_client_certificate_type = false;
+  bool no_check_ecdsa_curve = false;
+  int expect_selected_credential = -1;
+  std::vector<CredentialConfig> credentials;
 
   std::vector<const char*> handshaker_args;
 

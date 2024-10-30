@@ -1,256 +1,324 @@
-#! /usr/bin/env perl
-# Copyright 2015-2016 The OpenSSL Project Authors. All Rights Reserved.
-#
-# Licensed under the OpenSSL license (the "License").  You may not use
-# this file except in compliance with the License.  You can obtain a copy
-# in the file LICENSE in the source distribution or at
-# https://www.openssl.org/source/license.html
+#include <openssl/arm_arch.h>
 
-use strict;
+.text
 
-my $flavour = shift;
-my $output = shift;
-open STDOUT,">$output" || die "can't open $output: $!";
+.global	gcm_init_neon
+.type	gcm_init_neon,%function
+.align	4
+gcm_init_neon:
+	AARCH64_VALID_CALL_TARGET
+	// This function is adapted from gcm_init_v8. xC2 is t3.
+	ld1	{v17.2d}, [x1]			// load H
+	movi	v19.16b, #0xe1
+	shl	v19.2d, v19.2d, #57		// 0xc2.0
+	ext	v3.16b, v17.16b, v17.16b, #8
+	ushr	v18.2d, v19.2d, #63
+	dup	v17.4s, v17.s[1]
+	ext	v16.16b, v18.16b, v19.16b, #8	// t0=0xc2....01
+	ushr	v18.2d, v3.2d, #63
+	sshr	v17.4s, v17.4s, #31		// broadcast carry bit
+	and	v18.16b, v18.16b, v16.16b
+	shl	v3.2d, v3.2d, #1
+	ext	v18.16b, v18.16b, v18.16b, #8
+	and	v16.16b, v16.16b, v17.16b
+	orr	v3.16b, v3.16b, v18.16b	// H<<<=1
+	eor	v5.16b, v3.16b, v16.16b	// twisted H
+	st1	{v5.2d}, [x0]			// store Htable[0]
+	ret
+.size	gcm_init_neon,.-gcm_init_neon
 
-$flavour = "linux32" if (!$flavour or $flavour eq "void");
+.global	gcm_gmult_neon
+.type	gcm_gmult_neon,%function
+.align	4
+gcm_gmult_neon:
+	AARCH64_VALID_CALL_TARGET
+	ld1	{v3.16b}, [x0]		// load Xi
+	ld1	{v5.1d}, [x1], #8		// load twisted H
+	ld1	{v6.1d}, [x1]
+	adrp	x9, :pg_hi21:.Lmasks		// load constants
+	add	x9, x9, :lo12:.Lmasks
+	ld1	{v24.2d, v25.2d}, [x9]
+	rev64	v3.16b, v3.16b		// byteswap Xi
+	ext	v3.16b, v3.16b, v3.16b, #8
+	eor	v7.8b, v5.8b, v6.8b	// Karatsuba pre-processing
 
-my %GLOBALS;
-my $dotinlocallabels=($flavour=~/linux/)?1:0;
+	mov	x3, #16
+	b	.Lgmult_neon
+.size	gcm_gmult_neon,.-gcm_gmult_neon
 
-################################################################
-# directives which need special treatment on different platforms
-################################################################
-my $arch = sub {
-    if ($flavour =~ /linux/)	{ ".arch\t".join(',',@_); }
-    elsif ($flavour =~ /win64/) { ".arch\t".join(',',@_); }
-    else			{ ""; }
-};
-my $fpu = sub {
-    if ($flavour =~ /linux/)	{ ".fpu\t".join(',',@_); }
-    else			{ ""; }
-};
-my $hidden = sub {
-    if ($flavour =~ /ios/)	{ ".private_extern\t".join(',',@_); }
-    elsif ($flavour =~ /win64/) { ""; }
-    else			{ ".hidden\t".join(',',@_); }
-};
-my $comm = sub {
-    my @args = split(/,\s*/,shift);
-    my $name = @args[0];
-    my $global = \$GLOBALS{$name};
-    my $ret;
+.global	gcm_ghash_neon
+.type	gcm_ghash_neon,%function
+.align	4
+gcm_ghash_neon:
+	AARCH64_VALID_CALL_TARGET
+	ld1	{v0.16b}, [x0]		// load Xi
+	ld1	{v5.1d}, [x1], #8		// load twisted H
+	ld1	{v6.1d}, [x1]
+	adrp	x9, :pg_hi21:.Lmasks		// load constants
+	add	x9, x9, :lo12:.Lmasks
+	ld1	{v24.2d, v25.2d}, [x9]
+	rev64	v0.16b, v0.16b		// byteswap Xi
+	ext	v0.16b, v0.16b, v0.16b, #8
+	eor	v7.8b, v5.8b, v6.8b	// Karatsuba pre-processing
 
-    if ($flavour =~ /ios32/)	{
-	$ret = ".comm\t_$name,@args[1]\n";
-	$ret .= ".non_lazy_symbol_pointer\n";
-	$ret .= "$name:\n";
-	$ret .= ".indirect_symbol\t_$name\n";
-	$ret .= ".long\t0";
-	$name = "_$name";
-    } else			{ $ret = ".comm\t".join(',',@args); }
+.Loop_neon:
+	ld1	{v3.16b}, [x2], #16	// load inp
+	rev64	v3.16b, v3.16b		// byteswap inp
+	ext	v3.16b, v3.16b, v3.16b, #8
+	eor	v3.16b, v3.16b, v0.16b	// inp ^= Xi
 
-    $$global = $name;
-    $ret;
-};
-my $globl = sub {
-    my $name = shift;
-    my $global = \$GLOBALS{$name};
-    my $ret;
+.Lgmult_neon:
+	// Split the input into v3 and v4. (The upper halves are unused,
+	// so it is okay to leave them alone.)
+	ins	v4.d[0], v3.d[1]
+	ext	v16.8b, v5.8b, v5.8b, #1	// A1
+	pmull	v16.8h, v16.8b, v3.8b		// F = A1*B
+	ext	v0.8b, v3.8b, v3.8b, #1		// B1
+	pmull	v0.8h, v5.8b, v0.8b		// E = A*B1
+	ext	v17.8b, v5.8b, v5.8b, #2	// A2
+	pmull	v17.8h, v17.8b, v3.8b		// H = A2*B
+	ext	v19.8b, v3.8b, v3.8b, #2	// B2
+	pmull	v19.8h, v5.8b, v19.8b		// G = A*B2
+	ext	v18.8b, v5.8b, v5.8b, #3	// A3
+	eor	v16.16b, v16.16b, v0.16b	// L = E + F
+	pmull	v18.8h, v18.8b, v3.8b		// J = A3*B
+	ext	v0.8b, v3.8b, v3.8b, #3		// B3
+	eor	v17.16b, v17.16b, v19.16b	// M = G + H
+	pmull	v0.8h, v5.8b, v0.8b		// I = A*B3
 
-    SWITCH: for ($flavour) {
-	/ios/		&& do { $name = "_$name";
-				last;
-			      };
-    }
+	// Here we diverge from the 32-bit version. It computes the following
+	// (instructions reordered for clarity):
+	//
+	//     veor	$t0#lo, $t0#lo, $t0#hi	@ t0 = P0 + P1 (L)
+	//     vand	$t0#hi, $t0#hi, $k48
+	//     veor	$t0#lo, $t0#lo, $t0#hi
+	//
+	//     veor	$t1#lo, $t1#lo, $t1#hi	@ t1 = P2 + P3 (M)
+	//     vand	$t1#hi, $t1#hi, $k32
+	//     veor	$t1#lo, $t1#lo, $t1#hi
+	//
+	//     veor	$t2#lo, $t2#lo, $t2#hi	@ t2 = P4 + P5 (N)
+	//     vand	$t2#hi, $t2#hi, $k16
+	//     veor	$t2#lo, $t2#lo, $t2#hi
+	//
+	//     veor	$t3#lo, $t3#lo, $t3#hi	@ t3 = P6 + P7 (K)
+	//     vmov.i64	$t3#hi, #0
+	//
+	// $kN is a mask with the bottom N bits set. AArch64 cannot compute on
+	// upper halves of SIMD registers, so we must split each half into
+	// separate registers. To compensate, we pair computations up and
+	// parallelize.
 
-    $ret = ".globl	$name\n";
-    # All symbols in assembly files are hidden.
-    $ret .= &$hidden($name);
-    $$global = $name;
-    $ret;
-};
-my $global = $globl;
-my $extern = sub {
-    &$globl(@_);
-    return;	# return nothing
-};
-my $type = sub {
-    if ($flavour =~ /linux/)	{ ".type\t".join(',',@_); }
-    elsif ($flavour =~ /ios32/)	{ if (join(',',@_) =~ /(\w+),%function/) {
-					"#ifdef __thumb2__\n".
-					".thumb_func	$1\n".
-					"#endif";
-				  }
-			        }
-    elsif ($flavour =~ /win64/) { if (join(',',@_) =~ /(\w+),%function/) {
-                # See https://sourceware.org/binutils/docs/as/Pseudo-Ops.html
-                # Per https://docs.microsoft.com/en-us/windows/win32/debug/pe-format#coff-symbol-table,
-                # the type for functions is 0x20, or 32.
-                ".def $1\n".
-                "   .type 32\n".
-                ".endef";
-            }
-        }
-    else			{ ""; }
-};
-my $size = sub {
-    if ($flavour =~ /linux/)	{ ".size\t".join(',',@_); }
-    else			{ ""; }
-};
-my $inst = sub {
-    if ($flavour =~ /linux/)    { ".inst\t".join(',',@_); }
-    else                        { ".long\t".join(',',@_); }
-};
-my $asciz = sub {
-    my $line = join(",",@_);
-    if ($line =~ /^"(.*)"$/)
-    {	".byte	" . join(",",unpack("C*",$1),0) . "\n.align	2";	}
-    else
-    {	"";	}
-};
-my $section = sub {
-    if ($flavour =~ /ios/) {
-        if ($_[0] eq ".rodata") {
-            return ".section\t__TEXT,__const";
-        }
-        die "Unknown section name $_[0]";
-    } else {
-        return ".section\t" . join(",", @_);
-    }
-};
+	ext	v19.8b, v3.8b, v3.8b, #4	// B4
+	eor	v18.16b, v18.16b, v0.16b	// N = I + J
+	pmull	v19.8h, v5.8b, v19.8b		// K = A*B4
 
-sub range {
-  my ($r,$sfx,$start,$end) = @_;
+	// This can probably be scheduled more efficiently. For now, we just
+	// pair up independent instructions.
+	zip1	v20.2d, v16.2d, v17.2d
+	zip1	v22.2d, v18.2d, v19.2d
+	zip2	v21.2d, v16.2d, v17.2d
+	zip2	v23.2d, v18.2d, v19.2d
+	eor	v20.16b, v20.16b, v21.16b
+	eor	v22.16b, v22.16b, v23.16b
+	and	v21.16b, v21.16b, v24.16b
+	and	v23.16b, v23.16b, v25.16b
+	eor	v20.16b, v20.16b, v21.16b
+	eor	v22.16b, v22.16b, v23.16b
+	zip1	v16.2d, v20.2d, v21.2d
+	zip1	v18.2d, v22.2d, v23.2d
+	zip2	v17.2d, v20.2d, v21.2d
+	zip2	v19.2d, v22.2d, v23.2d
 
-    join(",",map("$r$_$sfx",($start..$end)));
-}
+	ext	v16.16b, v16.16b, v16.16b, #15	// t0 = t0 << 8
+	ext	v17.16b, v17.16b, v17.16b, #14	// t1 = t1 << 16
+	pmull	v0.8h, v5.8b, v3.8b		// D = A*B
+	ext	v19.16b, v19.16b, v19.16b, #12	// t3 = t3 << 32
+	ext	v18.16b, v18.16b, v18.16b, #13	// t2 = t2 << 24
+	eor	v16.16b, v16.16b, v17.16b
+	eor	v18.16b, v18.16b, v19.16b
+	eor	v0.16b, v0.16b, v16.16b
+	eor	v0.16b, v0.16b, v18.16b
+	eor	v3.8b, v3.8b, v4.8b	// Karatsuba pre-processing
+	ext	v16.8b, v7.8b, v7.8b, #1	// A1
+	pmull	v16.8h, v16.8b, v3.8b		// F = A1*B
+	ext	v1.8b, v3.8b, v3.8b, #1		// B1
+	pmull	v1.8h, v7.8b, v1.8b		// E = A*B1
+	ext	v17.8b, v7.8b, v7.8b, #2	// A2
+	pmull	v17.8h, v17.8b, v3.8b		// H = A2*B
+	ext	v19.8b, v3.8b, v3.8b, #2	// B2
+	pmull	v19.8h, v7.8b, v19.8b		// G = A*B2
+	ext	v18.8b, v7.8b, v7.8b, #3	// A3
+	eor	v16.16b, v16.16b, v1.16b	// L = E + F
+	pmull	v18.8h, v18.8b, v3.8b		// J = A3*B
+	ext	v1.8b, v3.8b, v3.8b, #3		// B3
+	eor	v17.16b, v17.16b, v19.16b	// M = G + H
+	pmull	v1.8h, v7.8b, v1.8b		// I = A*B3
 
-sub expand_line {
-  my $line = shift;
-  my @ret = ();
+	// Here we diverge from the 32-bit version. It computes the following
+	// (instructions reordered for clarity):
+	//
+	//     veor	$t0#lo, $t0#lo, $t0#hi	@ t0 = P0 + P1 (L)
+	//     vand	$t0#hi, $t0#hi, $k48
+	//     veor	$t0#lo, $t0#lo, $t0#hi
+	//
+	//     veor	$t1#lo, $t1#lo, $t1#hi	@ t1 = P2 + P3 (M)
+	//     vand	$t1#hi, $t1#hi, $k32
+	//     veor	$t1#lo, $t1#lo, $t1#hi
+	//
+	//     veor	$t2#lo, $t2#lo, $t2#hi	@ t2 = P4 + P5 (N)
+	//     vand	$t2#hi, $t2#hi, $k16
+	//     veor	$t2#lo, $t2#lo, $t2#hi
+	//
+	//     veor	$t3#lo, $t3#lo, $t3#hi	@ t3 = P6 + P7 (K)
+	//     vmov.i64	$t3#hi, #0
+	//
+	// $kN is a mask with the bottom N bits set. AArch64 cannot compute on
+	// upper halves of SIMD registers, so we must split each half into
+	// separate registers. To compensate, we pair computations up and
+	// parallelize.
 
-    pos($line)=0;
+	ext	v19.8b, v3.8b, v3.8b, #4	// B4
+	eor	v18.16b, v18.16b, v1.16b	// N = I + J
+	pmull	v19.8h, v7.8b, v19.8b		// K = A*B4
 
-    while ($line =~ m/\G[^@\/\{\"]*/g) {
-	if ($line =~ m/\G(@|\/\/|$)/gc) {
-	    last;
-	}
-	elsif ($line =~ m/\G\{/gc) {
-	    my $saved_pos = pos($line);
-	    $line =~ s/\G([rdqv])([0-9]+)([^\-]*)\-\1([0-9]+)\3/range($1,$3,$2,$4)/e;
-	    pos($line) = $saved_pos;
-	    $line =~ m/\G[^\}]*\}/g;
-	}
-	elsif ($line =~ m/\G\"/gc) {
-	    $line =~ m/\G[^\"]*\"/g;
-	}
-    }
+	// This can probably be scheduled more efficiently. For now, we just
+	// pair up independent instructions.
+	zip1	v20.2d, v16.2d, v17.2d
+	zip1	v22.2d, v18.2d, v19.2d
+	zip2	v21.2d, v16.2d, v17.2d
+	zip2	v23.2d, v18.2d, v19.2d
+	eor	v20.16b, v20.16b, v21.16b
+	eor	v22.16b, v22.16b, v23.16b
+	and	v21.16b, v21.16b, v24.16b
+	and	v23.16b, v23.16b, v25.16b
+	eor	v20.16b, v20.16b, v21.16b
+	eor	v22.16b, v22.16b, v23.16b
+	zip1	v16.2d, v20.2d, v21.2d
+	zip1	v18.2d, v22.2d, v23.2d
+	zip2	v17.2d, v20.2d, v21.2d
+	zip2	v19.2d, v22.2d, v23.2d
 
-    $line =~ s/\b(\w+)/$GLOBALS{$1} or $1/ge;
+	ext	v16.16b, v16.16b, v16.16b, #15	// t0 = t0 << 8
+	ext	v17.16b, v17.16b, v17.16b, #14	// t1 = t1 << 16
+	pmull	v1.8h, v7.8b, v3.8b		// D = A*B
+	ext	v19.16b, v19.16b, v19.16b, #12	// t3 = t3 << 32
+	ext	v18.16b, v18.16b, v18.16b, #13	// t2 = t2 << 24
+	eor	v16.16b, v16.16b, v17.16b
+	eor	v18.16b, v18.16b, v19.16b
+	eor	v1.16b, v1.16b, v16.16b
+	eor	v1.16b, v1.16b, v18.16b
+	ext	v16.8b, v6.8b, v6.8b, #1	// A1
+	pmull	v16.8h, v16.8b, v4.8b		// F = A1*B
+	ext	v2.8b, v4.8b, v4.8b, #1		// B1
+	pmull	v2.8h, v6.8b, v2.8b		// E = A*B1
+	ext	v17.8b, v6.8b, v6.8b, #2	// A2
+	pmull	v17.8h, v17.8b, v4.8b		// H = A2*B
+	ext	v19.8b, v4.8b, v4.8b, #2	// B2
+	pmull	v19.8h, v6.8b, v19.8b		// G = A*B2
+	ext	v18.8b, v6.8b, v6.8b, #3	// A3
+	eor	v16.16b, v16.16b, v2.16b	// L = E + F
+	pmull	v18.8h, v18.8b, v4.8b		// J = A3*B
+	ext	v2.8b, v4.8b, v4.8b, #3		// B3
+	eor	v17.16b, v17.16b, v19.16b	// M = G + H
+	pmull	v2.8h, v6.8b, v2.8b		// I = A*B3
 
-    return $line;
-}
+	// Here we diverge from the 32-bit version. It computes the following
+	// (instructions reordered for clarity):
+	//
+	//     veor	$t0#lo, $t0#lo, $t0#hi	@ t0 = P0 + P1 (L)
+	//     vand	$t0#hi, $t0#hi, $k48
+	//     veor	$t0#lo, $t0#lo, $t0#hi
+	//
+	//     veor	$t1#lo, $t1#lo, $t1#hi	@ t1 = P2 + P3 (M)
+	//     vand	$t1#hi, $t1#hi, $k32
+	//     veor	$t1#lo, $t1#lo, $t1#hi
+	//
+	//     veor	$t2#lo, $t2#lo, $t2#hi	@ t2 = P4 + P5 (N)
+	//     vand	$t2#hi, $t2#hi, $k16
+	//     veor	$t2#lo, $t2#lo, $t2#hi
+	//
+	//     veor	$t3#lo, $t3#lo, $t3#hi	@ t3 = P6 + P7 (K)
+	//     vmov.i64	$t3#hi, #0
+	//
+	// $kN is a mask with the bottom N bits set. AArch64 cannot compute on
+	// upper halves of SIMD registers, so we must split each half into
+	// separate registers. To compensate, we pair computations up and
+	// parallelize.
 
-my ($arch_defines, $target_defines);
-if ($flavour =~ /32/) {
-    $arch_defines = "defined(OPENSSL_ARM)";
-} elsif ($flavour =~ /64/) {
-    $arch_defines = "defined(OPENSSL_AARCH64)";
-} else {
-    die "unknown architecture: $flavour";
-}
-if ($flavour =~ /linux/) {
-    # Although the flavour is specified as "linux", it is really used by all
-    # ELF platforms.
-    $target_defines = "defined(__ELF__)";
-} elsif ($flavour =~ /ios/) {
-    # Although the flavour is specified as "ios", it is really used by all Apple
-    # platforms.
-    $target_defines = "defined(__APPLE__)";
-} elsif ($flavour =~ /win/) {
-    $target_defines = "defined(_WIN32)";
-} else {
-    die "unknown target: $flavour";
-}
+	ext	v19.8b, v4.8b, v4.8b, #4	// B4
+	eor	v18.16b, v18.16b, v2.16b	// N = I + J
+	pmull	v19.8h, v6.8b, v19.8b		// K = A*B4
 
-print <<___;
-// This file is generated from a similarly-named Perl script in the BoringSSL
-// source tree. Do not edit by hand.
+	// This can probably be scheduled more efficiently. For now, we just
+	// pair up independent instructions.
+	zip1	v20.2d, v16.2d, v17.2d
+	zip1	v22.2d, v18.2d, v19.2d
+	zip2	v21.2d, v16.2d, v17.2d
+	zip2	v23.2d, v18.2d, v19.2d
+	eor	v20.16b, v20.16b, v21.16b
+	eor	v22.16b, v22.16b, v23.16b
+	and	v21.16b, v21.16b, v24.16b
+	and	v23.16b, v23.16b, v25.16b
+	eor	v20.16b, v20.16b, v21.16b
+	eor	v22.16b, v22.16b, v23.16b
+	zip1	v16.2d, v20.2d, v21.2d
+	zip1	v18.2d, v22.2d, v23.2d
+	zip2	v17.2d, v20.2d, v21.2d
+	zip2	v19.2d, v22.2d, v23.2d
 
-#include <openssl/asm_base.h>
+	ext	v16.16b, v16.16b, v16.16b, #15	// t0 = t0 << 8
+	ext	v17.16b, v17.16b, v17.16b, #14	// t1 = t1 << 16
+	pmull	v2.8h, v6.8b, v4.8b		// D = A*B
+	ext	v19.16b, v19.16b, v19.16b, #12	// t3 = t3 << 32
+	ext	v18.16b, v18.16b, v18.16b, #13	// t2 = t2 << 24
+	eor	v16.16b, v16.16b, v17.16b
+	eor	v18.16b, v18.16b, v19.16b
+	eor	v2.16b, v2.16b, v16.16b
+	eor	v2.16b, v2.16b, v18.16b
+	ext	v16.16b, v0.16b, v2.16b, #8
+	eor	v1.16b, v1.16b, v0.16b	// Karatsuba post-processing
+	eor	v1.16b, v1.16b, v2.16b
+	eor	v1.16b, v1.16b, v16.16b	// Xm overlaps Xh.lo and Xl.hi
+	ins	v0.d[1], v1.d[0]		// Xh|Xl - 256-bit result
+	// This is a no-op due to the ins instruction below.
+	// ins	v2.d[0], v1.d[1]
 
-#if !defined(OPENSSL_NO_ASM) && $arch_defines && $target_defines
-___
+	// equivalent of reduction_avx from ghash-x86_64.pl
+	shl	v17.2d, v0.2d, #57		// 1st phase
+	shl	v18.2d, v0.2d, #62
+	eor	v18.16b, v18.16b, v17.16b	//
+	shl	v17.2d, v0.2d, #63
+	eor	v18.16b, v18.16b, v17.16b	//
+	// Note Xm contains {Xl.d[1], Xh.d[0]}.
+	eor	v18.16b, v18.16b, v1.16b
+	ins	v0.d[1], v18.d[0]		// Xl.d[1] ^= t2.d[0]
+	ins	v2.d[0], v18.d[1]		// Xh.d[0] ^= t2.d[1]
 
-while(my $line=<>) {
+	ushr	v18.2d, v0.2d, #1		// 2nd phase
+	eor	v2.16b, v2.16b,v0.16b
+	eor	v0.16b, v0.16b,v18.16b	//
+	ushr	v18.2d, v18.2d, #6
+	ushr	v0.2d, v0.2d, #1		//
+	eor	v0.16b, v0.16b, v2.16b	//
+	eor	v0.16b, v0.16b, v18.16b	//
 
-    if ($line =~ m/^\s*(#|@|\/\/)/)	{ print $line; next; }
+	subs	x3, x3, #16
+	bne	.Loop_neon
 
-    $line =~ s|/\*.*\*/||;	# get rid of C-style comments...
-    $line =~ s|^\s+||;		# ... and skip white spaces in beginning...
-    $line =~ s|\s+$||;		# ... and at the end
+	rev64	v0.16b, v0.16b		// byteswap Xi and write
+	ext	v0.16b, v0.16b, v0.16b, #8
+	st1	{v0.16b}, [x0]
 
-    if ($flavour =~ /64/) {
-	my $copy = $line;
-	# Also remove line comments.
-	$copy =~ s|//.*||;
-	if ($copy =~ /\b[wx]18\b/) {
-	    die "r18 is reserved by the platform and may not be used.";
-	}
-    }
+	ret
+.size	gcm_ghash_neon,.-gcm_ghash_neon
 
-    {
-	$line =~ s|[\b\.]L(\w{2,})|L$1|g;	# common denominator for Locallabel
-	$line =~ s|\bL(\w{2,})|\.L$1|g	if ($dotinlocallabels);
-    }
-
-    {
-	$line =~ s|(^[\.\w]+)\:\s*||;
-	my $label = $1;
-	if ($label) {
-	    printf "%s:",($GLOBALS{$label} or $label);
-	}
-    }
-
-    if ($line !~ m/^[#@]/) {
-	$line =~ s|^\s*(\.?)(\S+)\s*||;
-	my $c = $1; $c = "\t" if ($c eq "");
-	my $mnemonic = $2;
-	my $opcode;
-	if ($mnemonic =~ m/([^\.]+)\.([^\.]+)/) {
-	    $opcode = eval("\$$1_$2");
-	} else {
-	    $opcode = eval("\$$mnemonic");
-	}
-
-	if ($flavour =~ /ios/) {
-	    # Mach-O and ELF use different syntax for these relocations. Note
-	    # that we require :pg_hi21: to be explicitly listed. It is normally
-	    # optional with adrp instructions.
-	    $line =~ s|:pg_hi21:(\w+)|\1\@PAGE|;
-	    $line =~ s|:lo12:(\w+)|\1\@PAGEOFF|;
-	} else {
-	    # Clang's integrated assembly does not support the optional
-	    # :pg_hi21: markers, so erase them.
-	    $line =~ s|:pg_hi21:||;
-	}
-
-	my $arg=expand_line($line);
-
-	if (ref($opcode) eq 'CODE') {
-		$line = &$opcode($arg);
-	} elsif ($mnemonic)         {
-		$line = $c.$mnemonic;
-		$line.= "\t$arg" if ($arg ne "");
-	}
-    }
-
-    print $line if ($line);
-    print "\n";
-}
-
-print <<___;
-#endif  // !OPENSSL_NO_ASM && $arch_defines && $target_defines
-___
-
-close STDOUT or die "error closing STDOUT: $!";
+.section	.rodata
+.align	4
+.Lmasks:
+.quad	0x0000ffffffffffff	// k48
+.quad	0x00000000ffffffff	// k32
+.quad	0x000000000000ffff	// k16
+.quad	0x0000000000000000	// k0
+.asciz  "GHASH for ARMv8, derived from ARMv4 version by <appro@openssl.org>"
+.align  2

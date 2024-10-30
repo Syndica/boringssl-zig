@@ -6,24 +6,24 @@
 #include <memory>
 #include <set>
 
+#include <gtest/gtest.h>
+#include <openssl/nid.h>
 #include "cert_errors.h"
-#include "signature_algorithm.h"
-#include "test_helpers.h"
-#include "verify_signed_data.h"
 #include "input.h"
 #include "parse_values.h"
 #include "parser.h"
-#include <gtest/gtest.h>
-#include <openssl/nid.h>
+#include "signature_algorithm.h"
+#include "test_helpers.h"
+#include "verify_signed_data.h"
 
-namespace bssl {
+BSSL_NAMESPACE_BEGIN
 
 namespace {
 
 // Reads the public key and algorithm from the test data at |file_name|.
-void ReadTestCase(const char* file_name,
-                  SignatureAlgorithm* signature_algorithm,
-                  bssl::UniquePtr<EVP_PKEY>* public_key) {
+void ReadTestCase(const char *file_name,
+                  SignatureAlgorithm *signature_algorithm,
+                  bssl::UniquePtr<EVP_PKEY> *public_key) {
   std::string path =
       std::string("testdata/verify_signed_data_unittest/") + file_name;
 
@@ -38,25 +38,24 @@ void ReadTestCase(const char* file_name,
   ASSERT_TRUE(ReadTestDataFromPemFile(path, mappings));
 
   std::optional<SignatureAlgorithm> sigalg_opt =
-      ParseSignatureAlgorithm(der::Input(&algorithm_str));
+      ParseSignatureAlgorithm(der::Input(algorithm_str));
   ASSERT_TRUE(sigalg_opt);
   *signature_algorithm = *sigalg_opt;
 
-  ASSERT_TRUE(ParsePublicKey(der::Input(&public_key_str), public_key));
+  ASSERT_TRUE(ParsePublicKey(der::Input(public_key_str), public_key));
 }
 
 class SimplePathBuilderDelegate1024SuccessTest
-    : public ::testing::TestWithParam<const char*> {};
+    : public ::testing::TestWithParam<const char *> {};
 
-const char* kSuccess1024Filenames[] = {
+const char *kSuccess1024Filenames[] = {
     "rsa-pkcs1-sha1.pem",          "rsa-pkcs1-sha256.pem",
     "rsa2048-pkcs1-sha512.pem",    "ecdsa-secp384r1-sha256.pem",
     "ecdsa-prime256v1-sha512.pem", "rsa-pss-sha256.pem",
     "ecdsa-secp384r1-sha256.pem",  "ecdsa-prime256v1-sha512.pem",
 };
 
-INSTANTIATE_TEST_SUITE_P(All,
-                         SimplePathBuilderDelegate1024SuccessTest,
+INSTANTIATE_TEST_SUITE_P(All, SimplePathBuilderDelegate1024SuccessTest,
                          ::testing::ValuesIn(kSuccess1024Filenames));
 
 TEST_P(SimplePathBuilderDelegate1024SuccessTest, IsAcceptableSignatureAndKey) {
@@ -77,13 +76,12 @@ TEST_P(SimplePathBuilderDelegate1024SuccessTest, IsAcceptableSignatureAndKey) {
 }
 
 class SimplePathBuilderDelegate2048FailTest
-    : public ::testing::TestWithParam<const char*> {};
+    : public ::testing::TestWithParam<const char *> {};
 
-const char* kFail2048Filenames[] = {"rsa-pkcs1-sha1.pem",
+const char *kFail2048Filenames[] = {"rsa-pkcs1-sha1.pem",
                                     "rsa-pkcs1-sha256.pem"};
 
-INSTANTIATE_TEST_SUITE_P(All,
-                         SimplePathBuilderDelegate2048FailTest,
+INSTANTIATE_TEST_SUITE_P(All, SimplePathBuilderDelegate2048FailTest,
                          ::testing::ValuesIn(kFail2048Filenames));
 
 TEST_P(SimplePathBuilderDelegate2048FailTest, RsaKeySmallerThan2048) {
@@ -105,4 +103,4 @@ TEST_P(SimplePathBuilderDelegate2048FailTest, RsaKeySmallerThan2048) {
 
 }  // namespace
 
-}  // namespace net
+BSSL_NAMESPACE_END

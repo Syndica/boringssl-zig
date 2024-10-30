@@ -5,21 +5,19 @@
 #ifndef BSSL_PKI_PARSED_CERTIFICATE_H_
 #define BSSL_PKI_PARSED_CERTIFICATE_H_
 
-#include "fillins/openssl_util.h"
 #include <map>
 #include <memory>
+#include <optional>
 #include <vector>
 
-#include "fillins/check.h"
-
-#include "certificate_policies.h"
-#include "parse_certificate.h"
-#include "signature_algorithm.h"
-#include "input.h"
-#include <optional>
 #include <openssl/base.h>
 
-namespace bssl {
+#include "certificate_policies.h"
+#include "input.h"
+#include "parse_certificate.h"
+#include "signature_algorithm.h"
+
+BSSL_NAMESPACE_BEGIN
 
 struct GeneralNames;
 class NameConstraints;
@@ -47,7 +45,7 @@ class OPENSSL_EXPORT ParsedCertificate {
   };
 
  public:
-~ParsedCertificate();
+  ~ParsedCertificate();
   // Map from OID to ParsedExtension.
   using ExtensionsMap = std::map<der::Input, ParsedExtension>;
 
@@ -58,8 +56,7 @@ class OPENSSL_EXPORT ParsedCertificate {
   // information added to it.
   static std::shared_ptr<const ParsedCertificate> Create(
       bssl::UniquePtr<CRYPTO_BUFFER> cert_data,
-      const ParseCertificateOptions& options,
-      CertErrors* errors);
+      const ParseCertificateOptions &options, CertErrors *errors);
 
   // Creates a ParsedCertificate by copying the provided |data|, and appends it
   // to |chain|. Returns true if the certificate was successfully parsed and
@@ -69,32 +66,32 @@ class OPENSSL_EXPORT ParsedCertificate {
   // information added to it.
   static bool CreateAndAddToVector(
       bssl::UniquePtr<CRYPTO_BUFFER> cert_data,
-      const ParseCertificateOptions& options,
-      std::vector<std::shared_ptr<const ParsedCertificate>>* chain,
-      CertErrors* errors);
+      const ParseCertificateOptions &options,
+      std::vector<std::shared_ptr<const bssl::ParsedCertificate>> *chain,
+      CertErrors *errors);
 
   explicit ParsedCertificate(PrivateConstructor);
-  
-  ParsedCertificate(const ParsedCertificate&) = delete;
-  ParsedCertificate& operator=(const ParsedCertificate&) = delete;
+
+  ParsedCertificate(const ParsedCertificate &) = delete;
+  ParsedCertificate &operator=(const ParsedCertificate &) = delete;
 
   // Returns the DER-encoded certificate data for this cert.
-  const der::Input& der_cert() const { return cert_; }
+  der::Input der_cert() const { return cert_; }
 
   // Returns the CRYPTO_BUFFER backing this object.
-  CRYPTO_BUFFER* cert_buffer() const { return cert_data_.get(); }
+  CRYPTO_BUFFER *cert_buffer() const { return cert_data_.get(); }
 
   // Accessors for raw fields of the Certificate.
-  const der::Input& tbs_certificate_tlv() const { return tbs_certificate_tlv_; }
+  der::Input tbs_certificate_tlv() const { return tbs_certificate_tlv_; }
 
-  const der::Input& signature_algorithm_tlv() const {
+  der::Input signature_algorithm_tlv() const {
     return signature_algorithm_tlv_;
   }
 
-  const der::BitString& signature_value() const { return signature_value_; }
+  const der::BitString &signature_value() const { return signature_value_; }
 
   // Accessor for struct containing raw fields of the TbsCertificate.
-  const ParsedTbsCertificate& tbs() const { return tbs_; }
+  const ParsedTbsCertificate &tbs() const { return tbs_; }
 
   // Returns the signatureAlgorithm of the Certificate (not the tbsCertificate).
   // If the signature algorithm is unknown/unsupported, this returns nullopt.
@@ -110,7 +107,7 @@ class OPENSSL_EXPORT ParsedCertificate {
   // Sequence tag). This is guaranteed to be valid DER, though the contents of
   // unhandled string types are treated as raw bytes.
   der::Input normalized_subject() const {
-    return der::Input(&normalized_subject_);
+    return der::Input(normalized_subject_);
   }
   // Returns the DER-encoded raw issuer value (including the outer sequence
   // tag). This is guaranteed to be valid DER, though the contents of unhandled
@@ -120,7 +117,7 @@ class OPENSSL_EXPORT ParsedCertificate {
   // Sequence tag). This is guaranteed to be valid DER, though the contents of
   // unhandled string types are treated as raw bytes.
   der::Input normalized_issuer() const {
-    return der::Input(&normalized_issuer_);
+    return der::Input(normalized_issuer_);
   }
 
   // Returns true if the certificate has a BasicConstraints extension.
@@ -128,8 +125,8 @@ class OPENSSL_EXPORT ParsedCertificate {
 
   // Returns the ParsedBasicConstraints struct. Caller must check
   // has_basic_constraints() before accessing this.
-  const ParsedBasicConstraints& basic_constraints() const {
-    DCHECK(has_basic_constraints_);
+  const ParsedBasicConstraints &basic_constraints() const {
+    BSSL_CHECK(has_basic_constraints_);
     return basic_constraints_;
   }
 
@@ -138,8 +135,8 @@ class OPENSSL_EXPORT ParsedCertificate {
 
   // Returns the KeyUsage BitString. Caller must check
   // has_key_usage() before accessing this.
-  const der::BitString& key_usage() const {
-    DCHECK(has_key_usage_);
+  const der::BitString &key_usage() const {
+    BSSL_CHECK(has_key_usage_);
     return key_usage_;
   }
 
@@ -148,8 +145,8 @@ class OPENSSL_EXPORT ParsedCertificate {
 
   // Returns the ExtendedKeyUsage key purpose OIDs. Caller must check
   // has_extended_key_usage() before accessing this.
-  const std::vector<der::Input>& extended_key_usage() const {
-    DCHECK(has_extended_key_usage_);
+  const std::vector<der::Input> &extended_key_usage() const {
+    BSSL_CHECK(has_extended_key_usage_);
     return extended_key_usage_;
   }
 
@@ -159,13 +156,13 @@ class OPENSSL_EXPORT ParsedCertificate {
   // Returns the ParsedExtension struct for the SubjectAltName extension.
   // If the cert did not have a SubjectAltName extension, this will be a
   // default-initialized ParsedExtension struct.
-  const ParsedExtension& subject_alt_names_extension() const {
+  const ParsedExtension &subject_alt_names_extension() const {
     return subject_alt_names_extension_;
   }
 
   // Returns the GeneralNames class parsed from SubjectAltName extension, or
   // nullptr if no SubjectAltName extension was present.
-  const GeneralNames* subject_alt_names() const {
+  const GeneralNames *subject_alt_names() const {
     return subject_alt_names_.get();
   }
 
@@ -174,8 +171,8 @@ class OPENSSL_EXPORT ParsedCertificate {
 
   // Returns the parsed NameConstraints extension. Must not be called if
   // has_name_constraints() is false.
-  const NameConstraints& name_constraints() const {
-    DCHECK(name_constraints_);
+  const NameConstraints &name_constraints() const {
+    BSSL_CHECK(name_constraints_);
     return *name_constraints_;
   }
 
@@ -183,25 +180,25 @@ class OPENSSL_EXPORT ParsedCertificate {
   bool has_authority_info_access() const { return has_authority_info_access_; }
 
   // Returns the ParsedExtension struct for the AuthorityInfoAccess extension.
-  const ParsedExtension& authority_info_access_extension() const {
+  const ParsedExtension &authority_info_access_extension() const {
     return authority_info_access_extension_;
   }
 
   // Returns any caIssuers URIs from the AuthorityInfoAccess extension.
-  const std::vector<std::string_view>& ca_issuers_uris() const {
+  const std::vector<std::string_view> &ca_issuers_uris() const {
     return ca_issuers_uris_;
   }
 
   // Returns any OCSP URIs from the AuthorityInfoAccess extension.
-  const std::vector<std::string_view>& ocsp_uris() const { return ocsp_uris_; }
+  const std::vector<std::string_view> &ocsp_uris() const { return ocsp_uris_; }
 
   // Returns true if the certificate has a Policies extension.
   bool has_policy_oids() const { return has_policy_oids_; }
 
   // Returns the policy OIDs. Caller must check has_policy_oids() before
   // accessing this.
-  const std::vector<der::Input>& policy_oids() const {
-    DCHECK(has_policy_oids());
+  const std::vector<der::Input> &policy_oids() const {
+    BSSL_CHECK(has_policy_oids());
     return policy_oids_;
   }
 
@@ -210,8 +207,8 @@ class OPENSSL_EXPORT ParsedCertificate {
 
   // Returns the ParsedPolicyConstraints struct. Caller must check
   // has_policy_constraints() before accessing this.
-  const ParsedPolicyConstraints& policy_constraints() const {
-    DCHECK(has_policy_constraints_);
+  const ParsedPolicyConstraints &policy_constraints() const {
+    BSSL_CHECK(has_policy_constraints_);
     return policy_constraints_;
   }
 
@@ -220,41 +217,36 @@ class OPENSSL_EXPORT ParsedCertificate {
 
   // Returns the PolicyMappings extension. Caller must check
   // has_policy_mappings() before accessing this.
-  const std::vector<ParsedPolicyMapping>& policy_mappings() const {
-    DCHECK(has_policy_mappings_);
+  const std::vector<ParsedPolicyMapping> &policy_mappings() const {
+    BSSL_CHECK(has_policy_mappings_);
     return policy_mappings_;
   }
 
-  // Returns true if the certificate has a InhibitAnyPolicy extension.
-  bool has_inhibit_any_policy() const { return has_inhibit_any_policy_; }
-
-  // Returns the Inhibit Any Policy extension. Caller must check
-  // has_inhibit_any_policy() before accessing this.
-  uint8_t inhibit_any_policy() const {
-    DCHECK(has_inhibit_any_policy_);
+  // Returns the Inhibit Any Policy extension.
+  const std::optional<uint8_t> &inhibit_any_policy() const {
     return inhibit_any_policy_;
   }
 
   // Returns the AuthorityKeyIdentifier extension, or nullopt if there wasn't
   // one.
-  const std::optional<ParsedAuthorityKeyIdentifier>& authority_key_identifier()
+  const std::optional<ParsedAuthorityKeyIdentifier> &authority_key_identifier()
       const {
     return authority_key_identifier_;
   }
 
   // Returns the SubjectKeyIdentifier extension, or nullopt if there wasn't
   // one.
-  const std::optional<der::Input>& subject_key_identifier() const {
+  const std::optional<der::Input> &subject_key_identifier() const {
     return subject_key_identifier_;
   }
 
   // Returns a map of all the extensions in the certificate.
-  const ExtensionsMap& extensions() const { return extensions_; }
+  const ExtensionsMap &extensions() const { return extensions_; }
 
   // Gets the value for extension matching |extension_oid|. Returns false if the
   // extension is not present.
-  bool GetExtension(const der::Input& extension_oid,
-                    ParsedExtension* parsed_extension) const;
+  bool GetExtension(der::Input extension_oid,
+                    ParsedExtension *parsed_extension) const;
 
  private:
   // The backing store for the certificate data.
@@ -319,8 +311,7 @@ class OPENSSL_EXPORT ParsedCertificate {
   std::vector<ParsedPolicyMapping> policy_mappings_;
 
   // Inhibit Any Policy extension.
-  bool has_inhibit_any_policy_ = false;
-  uint8_t inhibit_any_policy_;
+  std::optional<uint8_t> inhibit_any_policy_;
 
   // AuthorityKeyIdentifier extension.
   std::optional<ParsedAuthorityKeyIdentifier> authority_key_identifier_;
@@ -332,6 +323,6 @@ class OPENSSL_EXPORT ParsedCertificate {
   ExtensionsMap extensions_;
 };
 
-}  // namespace net
+BSSL_NAMESPACE_END
 
 #endif  // BSSL_PKI_PARSED_CERTIFICATE_H_

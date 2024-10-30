@@ -4,15 +4,15 @@
 
 #include "general_names.h"
 
-#include "test_helpers.h"
 #include <gtest/gtest.h>
+#include "test_helpers.h"
 
-namespace bssl {
+BSSL_NAMESPACE_BEGIN
 namespace {
 
-::testing::AssertionResult LoadTestData(const char* token,
-                                        const std::string& basename,
-                                        std::string* result) {
+::testing::AssertionResult LoadTestData(const char *token,
+                                        const std::string &basename,
+                                        std::string *result) {
   std::string path = "testdata/name_constraints_unittest/" + basename;
 
   const PemBlockMapping mappings[] = {
@@ -23,13 +23,11 @@ namespace {
 }
 
 ::testing::AssertionResult LoadTestSubjectAltNameData(
-    const std::string& basename,
-    std::string* result) {
+    const std::string &basename, std::string *result) {
   return LoadTestData("SUBJECT ALTERNATIVE NAME", basename, result);
 }
 
-void ReplaceFirstSubstring(std::string* str,
-                           std::string_view substr,
+void ReplaceFirstSubstring(std::string *str, std::string_view substr,
                            std::string_view replacement) {
   size_t idx = str->find(substr);
   if (idx != std::string::npos) {
@@ -44,7 +42,7 @@ TEST(GeneralNames, CreateFailsOnEmptySubjectAltName) {
   ASSERT_TRUE(
       LoadTestSubjectAltNameData("san-invalid-empty.pem", &invalid_san_der));
   CertErrors errors;
-  EXPECT_FALSE(GeneralNames::Create(der::Input(&invalid_san_der), &errors));
+  EXPECT_FALSE(GeneralNames::Create(der::Input(invalid_san_der), &errors));
 }
 
 TEST(GeneralNames, OtherName) {
@@ -53,7 +51,7 @@ TEST(GeneralNames, OtherName) {
 
   CertErrors errors;
   std::unique_ptr<GeneralNames> general_names =
-      GeneralNames::Create(der::Input(&san_der), &errors);
+      GeneralNames::Create(der::Input(san_der), &errors);
   ASSERT_TRUE(general_names);
   EXPECT_EQ(GENERAL_NAME_OTHER_NAME, general_names->present_name_types);
   const uint8_t expected_der[] = {0x06, 0x04, 0x2a, 0x03, 0x04, 0x05,
@@ -68,7 +66,7 @@ TEST(GeneralNames, RFC822Name) {
 
   CertErrors errors;
   std::unique_ptr<GeneralNames> general_names =
-      GeneralNames::Create(der::Input(&san_der), &errors);
+      GeneralNames::Create(der::Input(san_der), &errors);
   ASSERT_TRUE(general_names);
   EXPECT_EQ(GENERAL_NAME_RFC822_NAME, general_names->present_name_types);
   ASSERT_EQ(1U, general_names->rfc822_names.size());
@@ -80,7 +78,7 @@ TEST(GeneralNames, CreateFailsOnNonAsciiRFC822Name) {
   ASSERT_TRUE(LoadTestSubjectAltNameData("san-rfc822name.pem", &san_der));
   ReplaceFirstSubstring(&san_der, "foo@example.com", "f\xF6\xF6@example.com");
   CertErrors errors;
-  EXPECT_FALSE(GeneralNames::Create(der::Input(&san_der), &errors));
+  EXPECT_FALSE(GeneralNames::Create(der::Input(san_der), &errors));
 }
 
 TEST(GeneralNames, DnsName) {
@@ -89,7 +87,7 @@ TEST(GeneralNames, DnsName) {
 
   CertErrors errors;
   std::unique_ptr<GeneralNames> general_names =
-      GeneralNames::Create(der::Input(&san_der), &errors);
+      GeneralNames::Create(der::Input(san_der), &errors);
   ASSERT_TRUE(general_names);
   EXPECT_EQ(GENERAL_NAME_DNS_NAME, general_names->present_name_types);
   ASSERT_EQ(1U, general_names->dns_names.size());
@@ -101,7 +99,7 @@ TEST(GeneralNames, CreateFailsOnNonAsciiDnsName) {
   ASSERT_TRUE(LoadTestSubjectAltNameData("san-dnsname.pem", &san_der));
   ReplaceFirstSubstring(&san_der, "foo.example.com", "f\xF6\xF6.example.com");
   CertErrors errors;
-  EXPECT_FALSE(GeneralNames::Create(der::Input(&san_der), &errors));
+  EXPECT_FALSE(GeneralNames::Create(der::Input(san_der), &errors));
 }
 
 TEST(GeneralNames, X400Address) {
@@ -110,7 +108,7 @@ TEST(GeneralNames, X400Address) {
 
   CertErrors errors;
   std::unique_ptr<GeneralNames> general_names =
-      GeneralNames::Create(der::Input(&san_der), &errors);
+      GeneralNames::Create(der::Input(san_der), &errors);
   ASSERT_TRUE(general_names);
   EXPECT_EQ(GENERAL_NAME_X400_ADDRESS, general_names->present_name_types);
   ASSERT_EQ(1U, general_names->x400_addresses.size());
@@ -125,7 +123,7 @@ TEST(GeneralNames, DirectoryName) {
 
   CertErrors errors;
   std::unique_ptr<GeneralNames> general_names =
-      GeneralNames::Create(der::Input(&san_der), &errors);
+      GeneralNames::Create(der::Input(san_der), &errors);
   ASSERT_TRUE(general_names);
   EXPECT_EQ(GENERAL_NAME_DIRECTORY_NAME, general_names->present_name_types);
   ASSERT_EQ(1U, general_names->directory_names.size());
@@ -140,7 +138,7 @@ TEST(GeneralNames, EDIPartyName) {
 
   CertErrors errors;
   std::unique_ptr<GeneralNames> general_names =
-      GeneralNames::Create(der::Input(&san_der), &errors);
+      GeneralNames::Create(der::Input(san_der), &errors);
   ASSERT_TRUE(general_names);
   EXPECT_EQ(GENERAL_NAME_EDI_PARTY_NAME, general_names->present_name_types);
   ASSERT_EQ(1U, general_names->edi_party_names.size());
@@ -154,7 +152,7 @@ TEST(GeneralNames, URI) {
 
   CertErrors errors;
   std::unique_ptr<GeneralNames> general_names =
-      GeneralNames::Create(der::Input(&san_der), &errors);
+      GeneralNames::Create(der::Input(san_der), &errors);
   ASSERT_TRUE(general_names);
   EXPECT_EQ(GENERAL_NAME_UNIFORM_RESOURCE_IDENTIFIER,
             general_names->present_name_types);
@@ -169,7 +167,7 @@ TEST(GeneralNames, CreateFailsOnNonAsciiURI) {
   ReplaceFirstSubstring(&san_der, "http://example.com",
                         "http://ex\xE4mple.com");
   CertErrors errors;
-  EXPECT_FALSE(GeneralNames::Create(der::Input(&san_der), &errors));
+  EXPECT_FALSE(GeneralNames::Create(der::Input(san_der), &errors));
 }
 
 TEST(GeneralNames, IPAddress_v4) {
@@ -178,11 +176,12 @@ TEST(GeneralNames, IPAddress_v4) {
 
   CertErrors errors;
   std::unique_ptr<GeneralNames> general_names =
-      GeneralNames::Create(der::Input(&san_der), &errors);
+      GeneralNames::Create(der::Input(san_der), &errors);
   ASSERT_TRUE(general_names);
   EXPECT_EQ(GENERAL_NAME_IP_ADDRESS, general_names->present_name_types);
   ASSERT_EQ(1U, general_names->ip_addresses.size());
-  EXPECT_EQ(fillins::IPAddress(192, 168, 6, 7), general_names->ip_addresses[0]);
+  static const uint8_t kIP[] = {192, 168, 6, 7};
+  EXPECT_EQ(der::Input(kIP), general_names->ip_addresses[0]);
   EXPECT_EQ(0U, general_names->ip_address_ranges.size());
 }
 
@@ -192,13 +191,13 @@ TEST(GeneralNames, IPAddress_v6) {
 
   CertErrors errors;
   std::unique_ptr<GeneralNames> general_names =
-      GeneralNames::Create(der::Input(&san_der), &errors);
+      GeneralNames::Create(der::Input(san_der), &errors);
   ASSERT_TRUE(general_names);
   EXPECT_EQ(GENERAL_NAME_IP_ADDRESS, general_names->present_name_types);
   ASSERT_EQ(1U, general_names->ip_addresses.size());
-  EXPECT_EQ(
-      fillins::IPAddress(0xFE, 0x80, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),
-      general_names->ip_addresses[0]);
+  static const uint8_t kIP[] = {0xFE, 0x80, 1, 2,  3,  4,  5,  6,
+                                7,    8,    9, 10, 11, 12, 13, 14};
+  EXPECT_EQ(der::Input(kIP), general_names->ip_addresses[0]);
   EXPECT_EQ(0U, general_names->ip_address_ranges.size());
 }
 
@@ -207,7 +206,7 @@ TEST(GeneralNames, CreateFailsOnInvalidLengthIpAddress) {
   ASSERT_TRUE(LoadTestSubjectAltNameData("san-invalid-ipaddress.pem",
                                          &invalid_san_der));
   CertErrors errors;
-  EXPECT_FALSE(GeneralNames::Create(der::Input(&invalid_san_der), &errors));
+  EXPECT_FALSE(GeneralNames::Create(der::Input(invalid_san_der), &errors));
 }
 
 TEST(GeneralNames, RegisteredIDs) {
@@ -216,7 +215,7 @@ TEST(GeneralNames, RegisteredIDs) {
 
   CertErrors errors;
   std::unique_ptr<GeneralNames> general_names =
-      GeneralNames::Create(der::Input(&san_der), &errors);
+      GeneralNames::Create(der::Input(san_der), &errors);
   ASSERT_TRUE(general_names);
   EXPECT_EQ(GENERAL_NAME_REGISTERED_ID, general_names->present_name_types);
   ASSERT_EQ(1U, general_names->registered_ids.size());
@@ -224,4 +223,4 @@ TEST(GeneralNames, RegisteredIDs) {
   EXPECT_EQ(der::Input(expected_der), general_names->registered_ids[0]);
 }
 
-}  // namespace net
+BSSL_NAMESPACE_END

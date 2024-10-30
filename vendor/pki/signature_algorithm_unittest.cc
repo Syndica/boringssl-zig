@@ -6,12 +6,11 @@
 
 #include <memory>
 
-#include "fillins/file_util.h"
+#include <gtest/gtest.h>
 #include "input.h"
 #include "parser.h"
-#include <gtest/gtest.h>
 
-namespace bssl {
+BSSL_NAMESPACE_BEGIN
 
 namespace {
 
@@ -1154,9 +1153,8 @@ TEST(SignatureAlgorithmTest, ParseRsaPss) {
         0x08, 0x30, 0x0b, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03,
         0x04, 0x02, 0x03, 0xa2, 0x03, 0x02, 0x01, 0x40},
        SignatureAlgorithm::kRsaPssSha512}};
-  for (const auto& t : kValidTests) {
-    EXPECT_EQ(ParseSignatureAlgorithm(der::Input(t.data.data(), t.data.size())),
-              t.expected);
+  for (const auto &t : kValidTests) {
+    EXPECT_EQ(ParseSignatureAlgorithm(der::Input(t.data)), t.expected);
   }
 
   struct {
@@ -1345,9 +1343,8 @@ TEST(SignatureAlgorithmTest, ParseRsaPss) {
         0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03,
         0x05, 0x00, 0xa2, 0x03, 0x02, 0x01, 0x41}},
   };
-  for (const auto& t : kInvalidTests) {
-    EXPECT_FALSE(
-        ParseSignatureAlgorithm(der::Input(t.data.data(), t.data.size())));
+  for (const auto &t : kInvalidTests) {
+    EXPECT_FALSE(ParseSignatureAlgorithm(der::Input(t.data)));
   }
 }
 
@@ -1451,4 +1448,4 @@ TEST(SignatureAlgorithmTest, ParseDerDsaWithSha256NoParams) {
 
 }  // namespace
 
-}  // namespace net
+BSSL_NAMESPACE_END

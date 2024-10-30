@@ -7,17 +7,17 @@
 #include <memory>
 #include <set>
 
-#include "cert_errors.h"
-#include "mock_signature_verify_cache.h"
-#include "signature_algorithm.h"
-#include "test_helpers.h"
-#include "input.h"
-#include "parse_values.h"
-#include "parser.h"
 #include <gtest/gtest.h>
 #include <optional>
+#include "cert_errors.h"
+#include "input.h"
+#include "mock_signature_verify_cache.h"
+#include "parse_values.h"
+#include "parser.h"
+#include "signature_algorithm.h"
+#include "test_helpers.h"
 
-namespace bssl {
+BSSL_NAMESPACE_BEGIN
 
 namespace {
 
@@ -34,9 +34,8 @@ enum VerifyResult {
 //
 // If expected_result was FAILURE then the test will only succeed if
 // VerifySignedData() returns false.
-void RunTestCase(VerifyResult expected_result,
-                 const char* file_name,
-                 SignatureVerifyCache* cache) {
+void RunTestCase(VerifyResult expected_result, const char *file_name,
+                 SignatureVerifyCache *cache) {
   std::string path =
       std::string("testdata/verify_signed_data_unittest/") + file_name;
 
@@ -55,10 +54,10 @@ void RunTestCase(VerifyResult expected_result,
   ASSERT_TRUE(ReadTestDataFromPemFile(path, mappings));
 
   std::optional<SignatureAlgorithm> signature_algorithm =
-      ParseSignatureAlgorithm(der::Input(&algorithm));
+      ParseSignatureAlgorithm(der::Input(algorithm));
   ASSERT_TRUE(signature_algorithm);
 
-  der::Parser signature_value_parser((der::Input(&signature_value)));
+  der::Parser signature_value_parser((der::Input(signature_value)));
   std::optional<der::BitString> signature_value_bit_string =
       signature_value_parser.ReadBitString();
   ASSERT_TRUE(signature_value_bit_string.has_value())
@@ -66,14 +65,14 @@ void RunTestCase(VerifyResult expected_result,
 
   bool expected_result_bool = expected_result == SUCCESS;
 
-  bool result = VerifySignedData(*signature_algorithm, der::Input(&signed_data),
+  bool result = VerifySignedData(*signature_algorithm, der::Input(signed_data),
                                  signature_value_bit_string.value(),
-                                 der::Input(&public_key), cache);
+                                 der::Input(public_key), cache);
 
   EXPECT_EQ(expected_result_bool, result);
 }
 
-void RunTestCase(VerifyResult expected_result, const char* file_name) {
+void RunTestCase(VerifyResult expected_result, const char *file_name) {
   RunTestCase(expected_result, file_name, /*cache=*/nullptr);
 }
 
@@ -239,4 +238,4 @@ TEST(VerifySignedDataTestWithCache, TestVerifyCache) {
 
 }  // namespace
 
-}  // namespace net
+BSSL_NAMESPACE_END

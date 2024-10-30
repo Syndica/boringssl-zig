@@ -4,16 +4,16 @@
 
 #include "certificate_policies.h"
 
-#include "test_helpers.h"
+#include <gtest/gtest.h>
 #include "input.h"
 #include "parser.h"
-#include <gtest/gtest.h>
+#include "test_helpers.h"
 
-namespace bssl {
+BSSL_NAMESPACE_BEGIN
 namespace {
 
-::testing::AssertionResult LoadTestData(const std::string& name,
-                                        std::string* result) {
+::testing::AssertionResult LoadTestData(const std::string &name,
+                                        std::string *result) {
   std::string path = "testdata/certificate_policies_unittest/" + name;
 
   const PemBlockMapping mappings[] = {
@@ -34,8 +34,7 @@ class ParseCertificatePoliciesExtensionOidsTest
 
 // Run the tests with all possible values for
 // |fail_parsing_unknown_qualifier_oids|.
-INSTANTIATE_TEST_SUITE_P(All,
-                         ParseCertificatePoliciesExtensionOidsTest,
+INSTANTIATE_TEST_SUITE_P(All, ParseCertificatePoliciesExtensionOidsTest,
                          testing::Bool());
 
 TEST_P(ParseCertificatePoliciesExtensionOidsTest, InvalidEmpty) {
@@ -44,7 +43,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest, InvalidEmpty) {
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_FALSE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
 }
 
@@ -54,7 +53,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest, InvalidIdentifierNotOid) {
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_FALSE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
 }
 
@@ -64,7 +63,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest, AnyPolicy) {
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_TRUE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
   ASSERT_EQ(1U, policies.size());
   EXPECT_EQ(der::Input(kAnyPolicyOid), policies[0]);
@@ -76,7 +75,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest, AnyPolicyWithQualifier) {
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_TRUE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
   ASSERT_EQ(1U, policies.size());
   EXPECT_EQ(der::Input(kAnyPolicyOid), policies[0]);
@@ -90,7 +89,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest,
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_FALSE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
 }
 
@@ -100,7 +99,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest, OnePolicy) {
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_TRUE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
   ASSERT_EQ(1U, policies.size());
   EXPECT_EQ(der::Input(policy_1_2_3_der), policies[0]);
@@ -112,7 +111,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest, OnePolicyWithQualifier) {
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_TRUE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
   ASSERT_EQ(1U, policies.size());
   EXPECT_EQ(der::Input(policy_1_2_3_der), policies[0]);
@@ -125,7 +124,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest,
   std::vector<der::Input> policies;
   CertErrors errors;
   bool result = ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors);
 
   if (fail_parsing_unknown_qualifier_oids()) {
@@ -144,7 +143,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest,
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_FALSE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
 }
 
@@ -156,7 +155,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest,
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_FALSE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
 }
 
@@ -168,7 +167,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest,
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_FALSE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
 }
 
@@ -180,7 +179,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest,
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_FALSE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
 }
 
@@ -190,7 +189,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest, TwoPolicies) {
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_TRUE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
   ASSERT_EQ(2U, policies.size());
   EXPECT_EQ(der::Input(policy_1_2_3_der), policies[0]);
@@ -203,7 +202,7 @@ TEST_P(ParseCertificatePoliciesExtensionOidsTest, TwoPoliciesWithQualifiers) {
   std::vector<der::Input> policies;
   CertErrors errors;
   EXPECT_TRUE(ParseCertificatePoliciesExtensionOids(
-      der::Input(&der), fail_parsing_unknown_qualifier_oids(), &policies,
+      der::Input(der), fail_parsing_unknown_qualifier_oids(), &policies,
       &errors));
   ASSERT_EQ(2U, policies.size());
   EXPECT_EQ(der::Input(policy_1_2_3_der), policies[0]);
@@ -216,7 +215,7 @@ TEST(ParseCertificatePoliciesExtensionTest, InvalidEmpty) {
   std::vector<PolicyInformation> policies;
   CertErrors errors;
   EXPECT_FALSE(
-      ParseCertificatePoliciesExtension(der::Input(&der), &policies, &errors));
+      ParseCertificatePoliciesExtension(der::Input(der), &policies, &errors));
 }
 
 TEST(ParseCertificatePoliciesExtensionTest,
@@ -226,7 +225,7 @@ TEST(ParseCertificatePoliciesExtensionTest,
   std::vector<PolicyInformation> policies;
   CertErrors errors;
   EXPECT_FALSE(
-      ParseCertificatePoliciesExtension(der::Input(&der), &policies, &errors));
+      ParseCertificatePoliciesExtension(der::Input(der), &policies, &errors));
 }
 
 TEST(ParseCertificatePoliciesExtensionTest, OnePolicyWithCustomQualifier) {
@@ -235,13 +234,13 @@ TEST(ParseCertificatePoliciesExtensionTest, OnePolicyWithCustomQualifier) {
   std::vector<PolicyInformation> policies;
   CertErrors errors;
   EXPECT_TRUE(
-      ParseCertificatePoliciesExtension(der::Input(&der), &policies, &errors));
+      ParseCertificatePoliciesExtension(der::Input(der), &policies, &errors));
   ASSERT_EQ(1U, policies.size());
-  PolicyInformation& policy = policies[0];
+  PolicyInformation &policy = policies[0];
   EXPECT_EQ(der::Input(policy_1_2_3_der), policy.policy_oid);
 
   ASSERT_EQ(1U, policy.policy_qualifiers.size());
-  PolicyQualifierInfo& qualifier = policy.policy_qualifiers[0];
+  PolicyQualifierInfo &qualifier = policy.policy_qualifiers[0];
   // 1.2.3.4
   const uint8_t kExpectedQualifierOid[] = {0x2a, 0x03, 0x04};
   EXPECT_EQ(der::Input(kExpectedQualifierOid), qualifier.qualifier_oid);
@@ -256,15 +255,15 @@ TEST(ParseCertificatePoliciesExtensionTest, TwoPolicies) {
   std::vector<PolicyInformation> policies;
   CertErrors errors;
   EXPECT_TRUE(
-      ParseCertificatePoliciesExtension(der::Input(&der), &policies, &errors));
+      ParseCertificatePoliciesExtension(der::Input(der), &policies, &errors));
   ASSERT_EQ(2U, policies.size());
   {
-    PolicyInformation& policy = policies[0];
+    PolicyInformation &policy = policies[0];
     EXPECT_EQ(der::Input(policy_1_2_3_der), policy.policy_oid);
     EXPECT_EQ(0U, policy.policy_qualifiers.size());
   }
   {
-    PolicyInformation& policy = policies[1];
+    PolicyInformation &policy = policies[1];
     EXPECT_EQ(der::Input(policy_1_2_4_der), policy.policy_oid);
     EXPECT_EQ(0U, policy.policy_qualifiers.size());
   }
@@ -276,13 +275,13 @@ TEST(ParseCertificatePoliciesExtensionTest, TwoPoliciesWithQualifiers) {
   std::vector<PolicyInformation> policies;
   CertErrors errors;
   EXPECT_TRUE(
-      ParseCertificatePoliciesExtension(der::Input(&der), &policies, &errors));
+      ParseCertificatePoliciesExtension(der::Input(der), &policies, &errors));
   ASSERT_EQ(2U, policies.size());
   {
-    PolicyInformation& policy = policies[0];
+    PolicyInformation &policy = policies[0];
     EXPECT_EQ(der::Input(policy_1_2_3_der), policy.policy_oid);
     ASSERT_EQ(1U, policy.policy_qualifiers.size());
-    PolicyQualifierInfo& qualifier = policy.policy_qualifiers[0];
+    PolicyQualifierInfo &qualifier = policy.policy_qualifiers[0];
     EXPECT_EQ(der::Input(kCpsPointerId), qualifier.qualifier_oid);
     // IA5String { "https://example.com/1_2_3" }
     const uint8_t kExpectedQualifier[] = {
@@ -292,10 +291,10 @@ TEST(ParseCertificatePoliciesExtensionTest, TwoPoliciesWithQualifiers) {
     EXPECT_EQ(der::Input(kExpectedQualifier), qualifier.qualifier);
   }
   {
-    PolicyInformation& policy = policies[1];
+    PolicyInformation &policy = policies[1];
     EXPECT_EQ(der::Input(policy_1_2_4_der), policy.policy_oid);
     ASSERT_EQ(1U, policy.policy_qualifiers.size());
-    PolicyQualifierInfo& qualifier = policy.policy_qualifiers[0];
+    PolicyQualifierInfo &qualifier = policy.policy_qualifiers[0];
     EXPECT_EQ(der::Input(kCpsPointerId), qualifier.qualifier_oid);
     // IA5String { "http://example.com/1_2_4" }
     const uint8_t kExpectedQualifier[] = {
@@ -310,4 +309,4 @@ TEST(ParseCertificatePoliciesExtensionTest, TwoPoliciesWithQualifiers) {
 // parsed_certificate_unittest.cc
 
 }  // namespace
-}  // namespace net
+BSSL_NAMESPACE_END
