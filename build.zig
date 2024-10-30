@@ -558,6 +558,18 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(libssl);
 
+    // const ssl_translate = b.addTranslateC(.{
+    //     .root_source_file = b.path("vendor/include/openssl/ssl.h"),
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // TODO: switch this to use ssl_translate when TranslateC.addIncludeDir can take a LazyPath
+    _ = b.addModule("ssl", .{
+        .root_source_file = b.path("gen/translate_c.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const libdecrepit = b.addStaticLibrary(.{
         .name = "decrepit",
         .target = target,
