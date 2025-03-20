@@ -1,5 +1,110 @@
 const std = @import("std");
 
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    const libfipsmodule = b.addStaticLibrary(.{
+        .name = "fipsmodule",
+        .target = target,
+        .optimize = optimize,
+    });
+    libfipsmodule.linkLibC();
+    libfipsmodule.addIncludePath(b.path("vendor/include"));
+    libfipsmodule.addCSourceFiles(.{
+        .root = b.path("vendor"),
+        .files = fipsmodule_sources,
+    });
+    libfipsmodule.addCSourceFiles(.{
+        .root = b.path("."),
+        .files = generated_fipsmodule_sources,
+    });
+    b.installArtifact(libfipsmodule);
+
+    const libcrypto = b.addStaticLibrary(.{
+        .name = "crypto",
+        .target = target,
+        .optimize = optimize,
+    });
+    libcrypto.linkLibC();
+    libcrypto.linkLibCpp();
+    libcrypto.linkLibrary(libfipsmodule);
+    libcrypto.addIncludePath(b.path("vendor/include"));
+    libcrypto.addCSourceFiles(.{
+        .root = b.path("vendor"),
+        .files = crypto_sources,
+    });
+    libcrypto.addCSourceFiles(.{
+        .root = b.path("."),
+        .files = generated_crypto_sources,
+    });
+    b.installArtifact(libcrypto);
+
+    const libssl = b.addStaticLibrary(.{
+        .name = "ssl",
+        .target = target,
+        .optimize = optimize,
+    });
+    libssl.linkLibC();
+    libssl.linkLibCpp();
+    libssl.linkLibrary(libcrypto);
+    libssl.addIncludePath(b.path("vendor/include"));
+    libssl.installHeadersDirectory(b.path("vendor/include"), "", .{});
+    libssl.addCSourceFiles(.{
+        .root = b.path("vendor"),
+        .files = ssl_sources,
+    });
+
+    b.installArtifact(libssl);
+
+    const ssl_translate = b.addTranslateC(.{
+        .root_source_file = b.path("vendor/include/openssl/ssl.h"),
+        .target = target,
+        .optimize = optimize,
+    });
+    _ = b.addModule("ssl", .{
+        .root_source_file = ssl_translate.getOutput(),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const libdecrepit = b.addStaticLibrary(.{
+        .name = "decrepit",
+        .target = target,
+        .optimize = optimize,
+    });
+    b.installArtifact(libdecrepit);
+
+    libdecrepit.addIncludePath(b.path("vendor/include"));
+    libdecrepit.linkLibrary(libcrypto);
+    libdecrepit.linkLibrary(libssl);
+    libdecrepit.linkLibC();
+    libdecrepit.addCSourceFiles(.{
+        .root = b.path("vendor"),
+        .files = decrepit_sources,
+    });
+
+    const libpki = b.addStaticLibrary(.{
+        .name = "pki",
+        .target = target,
+        .optimize = optimize,
+    });
+    libpki.linkLibC();
+    libpki.linkLibCpp();
+    libpki.linkLibrary(libcrypto);
+    libpki.addIncludePath(b.path("vendor/include"));
+    libpki.addCSourceFiles(.{
+        .root = b.path("vendor"),
+        .files = pki_sources,
+        .flags = &.{"-D_BORINGSSL_LIBPKI_"},
+    });
+
+    b.installArtifact(libpki);
+
+    libcrypto.root_module.omit_frame_pointer = false;
+    libssl.root_module.omit_frame_pointer = false;
+}
+
 const pki_sources = &.{
     "pki/cert_error_id.cc",
     "pki/cert_error_params.cc",
@@ -500,109 +605,3 @@ const generated_crypto_sources = &.{
     "vendor/third_party/fiat/asm/fiat_curve25519_adx_mul.S",
     "vendor/third_party/fiat/asm/fiat_curve25519_adx_square.S",
 };
-
-pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
-
-    const libfipsmodule = b.addStaticLibrary(.{
-        .name = "fipsmodule",
-        .target = target,
-        .optimize = optimize,
-    });
-    libfipsmodule.linkLibC();
-    libfipsmodule.addIncludePath(b.path("vendor/include"));
-    libfipsmodule.addCSourceFiles(.{
-        .root = b.path("vendor"),
-        .files = fipsmodule_sources,
-    });
-    libfipsmodule.addCSourceFiles(.{
-        .root = b.path("."),
-        .files = generated_fipsmodule_sources,
-    });
-    b.installArtifact(libfipsmodule);
-
-    const libcrypto = b.addStaticLibrary(.{
-        .name = "crypto",
-        .target = target,
-        .optimize = optimize,
-    });
-    libcrypto.linkLibC();
-    libcrypto.linkLibCpp();
-    libcrypto.linkLibrary(libfipsmodule);
-    libcrypto.addIncludePath(b.path("vendor/include"));
-    libcrypto.addCSourceFiles(.{
-        .root = b.path("vendor"),
-        .files = crypto_sources,
-    });
-    libcrypto.addCSourceFiles(.{
-        .root = b.path("."),
-        .files = generated_crypto_sources,
-    });
-    b.installArtifact(libcrypto);
-
-    const libssl = b.addStaticLibrary(.{
-        .name = "ssl",
-        .target = target,
-        .optimize = optimize,
-    });
-    libssl.linkLibC();
-    libssl.linkLibCpp();
-    libssl.linkLibrary(libcrypto);
-    libssl.addIncludePath(b.path("vendor/include"));
-    libssl.installHeadersDirectory(b.path("vendor/include"), "", .{});
-    libssl.addCSourceFiles(.{
-        .root = b.path("vendor"),
-        .files = ssl_sources,
-    });
-
-    b.installArtifact(libssl);
-
-    // const ssl_translate = b.addTranslateC(.{
-    //     .root_source_file = b.path("vendor/include/openssl/ssl.h"),
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // TODO: switch this to use ssl_translate when TranslateC.addIncludeDir can take a LazyPath
-    _ = b.addModule("ssl", .{
-        .root_source_file = b.path("gen/translate_c.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const libdecrepit = b.addStaticLibrary(.{
-        .name = "decrepit",
-        .target = target,
-        .optimize = optimize,
-    });
-    b.installArtifact(libdecrepit);
-
-    libdecrepit.addIncludePath(b.path("vendor/include"));
-    libdecrepit.linkLibrary(libcrypto);
-    libdecrepit.linkLibrary(libssl);
-    libdecrepit.linkLibC();
-    libdecrepit.addCSourceFiles(.{
-        .root = b.path("vendor"),
-        .files = decrepit_sources,
-    });
-
-    const libpki = b.addStaticLibrary(.{
-        .name = "pki",
-        .target = target,
-        .optimize = optimize,
-    });
-    libpki.linkLibC();
-    libpki.linkLibCpp();
-    libpki.linkLibrary(libcrypto);
-    libpki.addIncludePath(b.path("vendor/include"));
-    libpki.addCSourceFiles(.{
-        .root = b.path("vendor"),
-        .files = pki_sources,
-        .flags = &.{"-D_BORINGSSL_LIBPKI_"},
-    });
-
-    b.installArtifact(libpki);
-
-    libcrypto.root_module.omit_frame_pointer = false;
-    libssl.root_module.omit_frame_pointer = false;
-}

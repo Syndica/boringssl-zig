@@ -1,0 +1,13 @@
+.{
+    .name = .boringssl,
+    .minimum_zig_version = "0.14.0",
+    .version = "0.1.0",
+    .fingerprint = 0x5f0947d2595ed256,
+    .dependencies = .{},
+    .paths = .{
+        "gen",
+        "vendor",
+        "build.zig",
+        "build.zig.zon",
+    },
+}
