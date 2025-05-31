@@ -62,6 +62,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    ssl_translate.addIncludePath(b.path("vendor/include"));
     _ = b.addModule("ssl", .{
         .root_source_file = ssl_translate.getOutput(),
         .target = target,
