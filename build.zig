@@ -481,6 +481,10 @@ const fipsmodule_sources = &.{
 };
 
 const generated_fipsmodule_sources = &.{
+    "gen/bcm/aes-gcm-avx2-x86_64-apple.S",
+    "gen/bcm/aes-gcm-avx2-x86_64-linux.S",
+    "gen/bcm/aes-gcm-avx512-x86_64-apple.S",
+    "gen/bcm/aes-gcm-avx512-x86_64-linux.S",
     "gen/bcm/aesni-gcm-x86_64-apple.S",
     "gen/bcm/aesni-gcm-x86_64-linux.S",
     "gen/bcm/aesni-x86-apple.S",
