@@ -56,7 +56,6 @@ pub fn build(b: *std.Build) void {
         .root = ssl_source.path("."),
         .files = ssl_sources,
     });
-
     b.installArtifact(libssl);
 
     const ssl_translate = b.addTranslateC(.{
@@ -65,11 +64,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     ssl_translate.addIncludePath(ssl_source.path("include"));
-    _ = b.addModule("ssl", .{
+    const ssl_mod = b.addModule("ssl", .{
         .root_source_file = ssl_translate.getOutput(),
         .target = target,
         .optimize = optimize,
     });
+    ssl_mod.linkLibrary(libssl);
 
     const libdecrepit = b.addStaticLibrary(.{
         .name = "decrepit",
